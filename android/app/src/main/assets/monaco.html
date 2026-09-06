@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Custom VSCode Mobile</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#1e1e1e; }
+  #bar { display:flex; gap:6px; padding:8px; background:#252526; color:#ccc;
+         font-family:monospace; font-size:12px; align-items:center; }
+  #bar button { background:#0e639c; color:#fff; border:0; border-radius:4px; padding:6px 10px; }
+  #editor { width:100%; height:calc(100% - 41px); }
+  #server { width:100%; height:calc(100% - 41px); border:0; display:none; background:#fff; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span>Custom VSCode</span>
+  <button onclick="save()">Save</button>
+  <button onclick="toggleServer()">Server</button>
+  <span id="status">monaco local</span>
+</div>
+<div id="editor"></div>
+<iframe id="server" allow="clipboard-read; clipboard-write"></iframe>
+
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+<script>
+let editor = null;
+let serverUrl = null;
+try {
+  const q = new URLSearchParams(location.search);
+  serverUrl = q.get('server');
+} catch(e) {}
+
+function log(m){ try { AndroidBridge.onLog(String(m)); } catch(e){ console.log(m); } }
+
+require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
+require(['vs/editor/editor.main'], function() {
+  let initial = '// Welcome to Custom VSCode Mobile\n// Connect GitHub in the app bar above, then edit.\n';
+  try {
+    initial = AndroidBridge.getLastEdit() || initial;
+  } catch(e) {}
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    value: initial,
+    language: 'javascript',
+    theme: 'vs-dark',
+    minimap: { enabled: false },
+    fontSize: 14,
+    automaticLayout: true,
+    wordWrap: 'on'
+  });
+  log('monaco ready');
+});
+
+function loadCode(code, language) {
+  if (!editor) { setTimeout(() => loadCode(code, language), 300); return; }
+  editor.setValue(code || '');
+  if (language) monaco.editor.setModelLanguage(editor.getModel(), language);
+  document.getElementById('status').textContent = 'loaded (' + (language||'text') + ')';
+}
+
+function save() {
+  if (!editor) return;
+  const v = editor.getValue();
+  try { AndroidBridge.onSave(v); } catch(e) {}
+  document.getElementById('status').textContent = 'saved ' + new Date().toLocaleTimeString();
+}
+
+function toggleServer() {
+  const f = document.getElementById('server');
+  const ed = document.getElementById('editor');
+  if (!serverUrl) { log('No ?server= URL set. Set it from MainActivity settings.'); return; }
+  if (f.style.display === 'none') {
+    f.src = serverUrl;
+    f.style.display = 'block'; ed.style.display = 'none';
+    document.getElementById('status').textContent = 'server mode';
+  } else {
+    f.style.display = 'none'; ed.style.display = 'block';
+    document.getElementById('status').textContent = 'monaco local';
+  }
+}
+
+function guessLang(path) {
+  if (!path) return 'plaintext';
+  if (path.endsWith('.kt')) return 'kotlin';
+  if (path.endsWith('.java')) return 'java';
+  if (path.endsWith('.py')) return 'python';
+  if (path.endsWith('.ts') || path.endsWith('.tsx')) return 'typescript';
+  if (path.endsWith('.js') || path.endsWith('.jsx')) return 'javascript';
+  if (path.endsWith('.json')) return 'json';
+  if (path.endsWith('.md')) return 'markdown';
+  if (path.endsWith('.html') || path.endsWith('.xml')) return 'html';
+  if (path.endsWith('.css')) return 'css';
+  if (path.endsWith('.go')) return 'go';
+  if (path.endsWith('.rs')) return 'rust';
+  return 'plaintext';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"id":"git","name":"Git","version":"2.44","abi":"arm64-v8a","binaries":["git"],"downloadSizeMb":28.0,"installSizeMb":90.0,"notes":"Version control. Local operations work offline after install."}

@@ -2,200 +2,141 @@ package com.customvscode.mobile
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.ViewGroup
-import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
-import kotlin.concurrent.thread
+import com.customvscode.mobile.bridge.FileBridge
+import com.customvscode.mobile.bridge.ProjectBridge
+import com.customvscode.mobile.bridge.RuntimeBridge
+import com.customvscode.mobile.bridge.TerminalBridge
+import com.customvscode.mobile.preview.PreviewBridge
+import com.customvscode.mobile.webview.WorkbenchWebView
 
+/**
+ * Stage 1 host: native toolbar (Project / Run / Preview / Settings)
+ * + local WorkbenchWebView. No remote editor, no cloud dependency.
+ */
 class MainActivity : Activity() {
 
-    private lateinit var webView: WebView
-    private lateinit var bridge: VSCodeBridge
-    private lateinit var statusView: TextView
-    private lateinit var tokenInput: EditText
-    private lateinit var repoInput: EditText
-    private lateinit var pathInput: EditText
+    private lateinit var app: IdeApplication
+    private lateinit var web: WorkbenchWebView
 
-    private var lastSha: String? = null
-    private var pendingSave: String? = null
-
-    @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
+    @SuppressLint("AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        app = application as IdeApplication
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
+            layoutParams = ViewGroup.LayoutParams(-1, -1)
         }
 
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 8)
-            setBackgroundColor(0xFF252526.toInt())
+        val barScroll = android.widget.HorizontalScrollView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setBackgroundColor(0xFF1E1E1E.toInt())
+            isHorizontalScrollBarEnabled = false
         }
-
-        statusView = TextView(this).apply {
-            text = "Not connected"
-            setTextColor(0xFFCCCCCC.toInt())
-            textSize = 12f
-        }
-
-        tokenInput = EditText(this).apply {
-            hint = getString(R.string.hint_token)
-            setHintTextColor(0xFF888888.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 13f
-        }
-        repoInput = EditText(this).apply {
-            hint = getString(R.string.hint_repo)
-            setHintTextColor(0xFF888888.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 13f
-        }
-        pathInput = EditText(this).apply {
-            hint = getString(R.string.hint_path)
-            setHintTextColor(0xFF888888.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 13f
-            setText("README.md")
-        }
-
-        val btnRow = LinearLayout(this).apply {
+        val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            setPadding(8, 8, 8, 8)
         }
-        val btnLoad = Button(this).apply { text = "Open" }
-        val btnPush = Button(this).apply { text = "Push" }
-        val btnLocal = Button(this).apply { text = "Reload editor" }
-        btnRow.addView(btnLoad, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        btnRow.addView(btnPush, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        btnRow.addView(btnLocal, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+        fun btn(label: String, fn: () -> Unit) =
+            android.widget.Button(this).apply {
+                text = label
+                textSize = 14f
+                minimumHeight = dp(48)
+                minHeight = dp(48)
+                setPadding(dp(16), 0, dp(16), 0)
+                setOnClickListener { fn() }
+            }.also {
+                bar.addView(it, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)).apply {
+                    marginEnd = dp(8)
+                })
+            }
 
-        form.addView(statusView)
-        form.addView(tokenInput)
-        form.addView(repoInput)
-        form.addView(pathInput)
-        form.addView(btnRow)
+        btn("＋ Project") { newProjectDialog() }
+        btn("▶ Run") { runLaravelDialog() }
+        btn("🌐 Preview") { openPreview() }
+        btn("↻ Reload") { web.loadWorkbench() }
+        barScroll.addView(bar)
 
-        val scroll = ScrollView(this).apply {
-            addView(form)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+        web = WorkbenchWebView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
         }
-
-        webView = WebView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0, 1f
-            )
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.mediaPlaybackRequiresUserGesture = false
-            settings.cacheMode = WebSettings.LOAD_DEFAULT
-            settings.allowFileAccess = true
-            webViewClient = WebViewClient()
-        }
-
-        bridge = VSCodeBridge(
-            webView = webView,
-            filesDir = filesDir,
-            onSave = { content ->
-                pendingSave = content
-                statusView.text = "Edited locally (${content.length} chars) — tap Push to send to GitHub"
+        web.addJavascriptInterface(FileBridge(app.workspace), "FileBridge")
+        web.addJavascriptInterface(TerminalBridge(web, app.workspace, app.runtimes), "TerminalBridge")
+        web.addJavascriptInterface(
+            ProjectBridge(app.workspace, app.projects) { msg ->
+                runOnUiThread { web.pushEvent("window.__projectEvent", msg) }
             },
-            onLog = { msg ->
-                statusView.text = msg
-            }
+            "ProjectBridge"
         )
-        webView.addJavascriptInterface(bridge, "AndroidBridge")
-        webView.loadUrl("file:///android_asset/monaco.html")
+        web.addJavascriptInterface(RuntimeBridge(app.runtimes), "RuntimeBridge")
+        web.addJavascriptInterface(PreviewBridge(app.previews), "PreviewBridge")
+        // Legacy bridge kept for GitHub prototype screen (TODO: remove after explorer ships)
+        try {
+            web.addJavascriptInterface(
+                VSCodeBridge(web, filesDir,
+                    onSave = { },
+                    onLog = { }),
+                "AndroidBridge"
+            )
+        } catch (_: Exception) { }
 
-        btnLoad.setOnClickListener { openFromGitHub() }
-        btnPush.setOnClickListener { pushToGitHub() }
-        btnLocal.setOnClickListener { webView.reload() }
-
-        root.addView(scroll)
-        root.addView(webView)
+        root.addView(barScroll)
+        root.addView(web)
         setContentView(root)
+        web.loadWorkbench()
     }
 
-    private fun openFromGitHub() {
-        val token = tokenInput.text.toString().trim()
-        val repo = repoInput.text.toString().trim()
-        val path = pathInput.text.toString().trim()
-        if (token.isEmpty() || repo.isEmpty() || path.isEmpty()) {
-            toast("Fill token + repo + path first")
-            return
-        }
-        statusView.text = "Loading $repo/$path…"
-        thread {
-            val file = GitHubApi.getFile(token, repo, path)
-            runOnUiThread {
-                if (file == null) {
-                    statusView.text = "Load failed — check repo/branch/token"
-                    toast("Load failed")
-                } else {
-                    lastSha = file.sha
-                    pendingSave = file.text
-                    bridge.loadCode(file.text, guessLang(path))
-                    statusView.text = "Loaded $path (${file.text.length} chars)"
-                }
+    private fun newProjectDialog() {
+        val input = EditText(this).apply { hint = "project-name (a-z 0-9 . _ -)" }
+        AlertDialog.Builder(this)
+            .setTitle("Create Laravel Project")
+            .setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val name = input.text.toString().trim()
+                web.evaluateJavascript("window.__createProject && window.__createProject(`laravel`, `$name`)", null)
             }
-        }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
-    private fun pushToGitHub() {
-        val token = tokenInput.text.toString().trim()
-        val repo = repoInput.text.toString().trim()
-        val path = pathInput.text.toString().trim()
-        val content = pendingSave
-        if (token.isEmpty() || repo.isEmpty() || path.isEmpty() || content == null) {
-            toast("Nothing to push — Open a file and edit first")
-            return
-        }
-        statusView.text = "Pushing…"
-        thread {
-            val ok = GitHubApi.putFile(token, repo, path, content, "Update $path via mobile", lastSha)
-            runOnUiThread {
-                statusView.text = if (ok) "Pushed $path ✓" else "Push failed — check token/sha"
-                toast(if (ok) "Pushed" else "Push failed")
+    private fun runLaravelDialog() {
+        val input = EditText(this).apply { hint = "project-name" }
+        AlertDialog.Builder(this)
+            .setTitle("Run: php artisan serve")
+            .setView(input)
+            .setPositiveButton("Start") { _, _ ->
+                val name = input.text.toString().trim()
+                Thread {
+                    val res = app.previews.startLaravel(name)
+                    runOnUiThread {
+                        Toast.makeText(this, res, Toast.LENGTH_LONG).show()
+                        web.pushEvent("window.__projectEvent", "PREVIEW:$res")
+                    }
+                }.also { it.isDaemon = true; it.start() }
             }
-        }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
-    private fun guessLang(path: String): String {
-        return when {
-            path.endsWith(".kt") -> "kotlin"
-            path.endsWith(".java") -> "java"
-            path.endsWith(".py") -> "python"
-            path.endsWith(".json") -> "json"
-            path.endsWith(".md") -> "markdown"
-            path.endsWith(".xml") -> "xml"
-            path.endsWith(".html") -> "html"
-            path.endsWith(".css") -> "css"
-            path.endsWith(".ts") -> "typescript"
-            else -> "javascript"
-        }
-    }
-
-    private fun toast(msg: String) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private fun openPreview() {
+        val url = app.previews.url()
+        Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
+        web.evaluateJavascript("window.__openPreview && window.__openPreview(`$url`)", null)
     }
 
     override fun onDestroy() {
-        webView.destroy()
+        try {
+            web.removeJavascriptInterface("FileBridge")
+            web.destroy()
+        } catch (_: Exception) { }
         super.onDestroy()
     }
 }

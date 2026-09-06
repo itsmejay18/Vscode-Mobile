@@ -1,0 +1,1 @@
+{"id":"laravel-installer","name":"Laravel Installer","version":"5","abi":"all","binaries":["laravel"],"requires":["php","composer"],"downloadSizeMb":2.0,"installSizeMb":4.0,"notes":"Optional; primary flow uses composer create-project."}

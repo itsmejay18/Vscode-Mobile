@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Custom VSCode Mobile</title>
+<style>
+:root{color-scheme:dark;--bar:#1b1b1d;--panel:#252526;--accent:#0e639c;--txt:#e6e6e6;--mut:#9a9a9a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#1e1e1e;color:var(--txt);font-family:system-ui,monospace;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100dvh}
+/* App bar: 56px, touch-friendly */
+#appbar{display:flex;align-items:center;gap:4px;background:var(--bar);padding:6px 8px;min-height:56px;border-bottom:1px solid #000}
+#appbar .iconbtn{width:48px;height:48px;font-size:22px;background:none;border:0;color:var(--txt);border-radius:8px}
+#appbar .iconbtn:active{background:#333}
+#proj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+#proj small{color:var(--mut)}
+/* Views */
+#views{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;display:none;flex-direction:column;min-height:0}
+.view.active{display:flex}
+/* Files */
+#filebar{display:flex;gap:8px;padding:10px}
+#filebar button{flex:1;min-height:48px;font-size:15px;background:#333;color:#fff;border:0;border-radius:8px}
+#expl{flex:1;overflow-y:auto;padding:4px 8px 24px;-webkit-overflow-scrolling:touch}
+#expl .f{min-height:52px;display:flex;align-items:center;gap:10px;padding:10px 12px;font-size:16px;border-radius:8px}
+#expl .f:active{background:#333}
+#expl .f.dir{color:#8cd8ff;font-weight:bold}
+#expl h4{color:var(--mut);font-size:12px;margin:10px 4px 2px;font-weight:normal}
+/* Editor */
+#tabs{display:flex;gap:6px;padding:8px;overflow-x:auto;background:#2d2d2d;-webkit-overflow-scrolling:touch}
+#tabs .t{flex:0 0 auto;min-height:44px;display:flex;align-items:center;gap:8px;background:#3c3c3c;padding:8px 12px;border-radius:8px;font-size:14px;max-width:220px}
+#tabs .t.active{background:#1e1e1e;color:#fff;outline:1px solid #555}
+#tabs .t .x{font-size:16px;padding:4px 8px}
+#tabs .t .d{color:#f55}
+#code{flex:1;width:100%;background:#1e1e1e;color:#d4d4d4;border:0;outline:0;resize:none;padding:12px;font:16px/1.65 monospace;white-space:pre;-webkit-overflow-scrolling:touch}
+#edmeta{display:flex;gap:8px;padding:6px 10px;background:#2d2d2d;font-size:12px;color:var(--mut)}
+#edmeta button{margin-left:auto;min-height:44px;padding:6px 18px;font-size:15px;background:var(--accent);color:#fff;border:0;border-radius:8px}
+/* Terminal */
+#term{flex:1;overflow-y:auto;padding:10px;font-size:14px;white-space:pre-wrap;background:#0c0c0c;-webkit-overflow-scrolling:touch}
+#termkeys{display:flex;gap:8px;padding:8px;background:#1b1b1b}
+#termkeys button{flex:1;min-height:48px;font-size:15px;background:#333;color:#fff;border:0;border-radius:8px}
+#termin{width:100%;background:#000;color:#0f0;border:0;border-top:1px solid #333;padding:14px 10px;font:16px monospace}
+/* Menu */
+#menu{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
+#menu button{min-height:52px;font-size:16px;background:#333;color:#fff;border:0;border-radius:10px;text-align:left;padding:0 16px}
+#menu button.primary{background:var(--accent)}
+#settings{font-size:14px}
+/* Bottom nav */
+#bottomnav{display:flex;background:var(--bar);border-top:1px solid #000;padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+#bottomnav button{flex:1;background:none;border:0;color:var(--mut);font-size:12px;min-height:56px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+#bottomnav button .i{font-size:22px}
+#bottomnav button.active{color:#fff;background:#2d2d2d}
+/* Status */
+#status{background:#007acc;color:#fff;font-size:12px;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Palette sheet */
+#pal{position:fixed;inset:auto 0 0 0;max-height:70%;background:#252526;border-top:1px solid #555;display:none;z-index:20;flex-direction:column;border-radius:16px 16px 0 0;overflow:hidden}
+#pal input{background:#111;color:#fff;border:0;padding:16px;font-size:17px;min-height:56px}
+#palitems{overflow-y:auto}
+#palitems div{padding:14px 16px;font-size:16px;min-height:52px}
+#palitems div:active{background:var(--accent)}
+/* Preview full-screen */
+#prev{position:fixed;inset:0;background:#fff;display:none;z-index:30;flex-direction:column}
+#prevbar{display:flex;align-items:center;gap:8px;background:#333;color:#fff;padding:8px}
+#prevbar button{min-height:48px;padding:6px 18px;font-size:15px}
+#prevf{flex:1;border:0}
+/* Wide screens: tablets / landscape / desktop */
+@media (min-width:900px){
+  #bottomnav{display:none}
+  #views{position:static}
+  .view{display:none}
+  #views.split .view.active{display:flex}
+  #views.split{flex-direction:row;display:flex}
+  #views.split #view-files{position:static;width:280px;border-right:1px solid #000}
+  #views.split #view-edit{position:static;flex:1}
+  #views.split #view-term{position:static;width:380px;border-left:1px solid #000}
+  #views.split #view-menu{position:static;width:320px;border-left:1px solid #000}
+}
+</style>
+</head>
+<body>
+<div id="appbar">
+  <button class="iconbtn" onclick="toggleFiles()" title="Files">☰</button>
+  <div id="proj">Custom VSCode <small>no project</small></div>
+  <button class="iconbtn" onclick="save()" title="Save">💾</button>
+  <button class="iconbtn" onclick="palette()" title="Commands">⋮</button>
+</div>
+
+<div id="views">
+  <div class="view active" id="view-files">
+    <div id="filebar"><button onclick="mkfile()">＋ File</button><button onclick="mkdir()">＋ Folder</button><button onclick="refresh()">↻</button></div>
+    <div id="expl"></div>
+  </div>
+  <div class="view" id="view-edit">
+    <div id="tabs"></div>
+    <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="// open a file from Files"></textarea>
+    <div id="edmeta"><span id="cursor">Ln 1</span><span id="lang">plaintext</span><button onclick="save()">Save</button></div>
+  </div>
+  <div class="view" id="view-term">
+    <div id="term"></div>
+    <div id="termkeys"><button onclick="termKey('	')">Tab</button><button onclick="termInterrupt()">Ctrl+C</button><button onclick="termKey('[A')">↑</button><button onclick="termKey('[B')">↓</button></div>
+    <input id="termin" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="$  type command, Enter = run" onkeydown="if(event.key==='Enter'){termSend(this.value);this.value=''}"/>
+  </div>
+  <div class="view" id="view-menu">
+    <div id="menu">
+      <button class="primary" onclick="newProject()">＋ New Project (Laravel)</button>
+      <button onclick="runServer()">▶ Run Laravel Server</button>
+      <button onclick="openPreview()">🌐 Open Preview</button>
+      <button onclick="newTerm();show('view-term')">▣ New Terminal</button>
+      <button onclick="showSettings()">⚙ Development Environments</button>
+      <button onclick="location.reload()">↻ Reload Workbench</button>
+      <div id="settings"></div>
+    </div>
+  </div>
+</div>
+
+<div id="status">ready • local only</div>
+
+<nav id="bottomnav">
+  <button class="active" id="nav-files" onclick="show('view-files')"><span class="i">📁</span>Files</button>
+  <button id="nav-edit" onclick="show('view-edit')"><span class="i">📝</span>Edit</button>
+  <button id="nav-term" onclick="show('view-term')"><span class="i">▣</span>Term</button>
+  <button id="nav-menu" onclick="show('view-menu')"><span class="i">☰</span>Menu</button>
+</nav>
+
+<div id="pal"><input id="palin" placeholder="> type a command"/><div id="palitems"></div></div>
+<div id="prev"><div id="prevbar"><span id="prevurl" style="flex:1;overflow:hidden"></span><button onclick="closePreview()">Close</button></div><iframe id="prevf"></iframe></div>
+
+<script>
+/* Fully local workbench. Bridges: FileBridge, TerminalBridge, ProjectBridge, RuntimeBridge, PreviewBridge. */
+let project = null, files = [], tabs = [], active = -1, dirty = {}, termId = -1;
+const $ = id => document.getElementById(id);
+const wide = () => window.matchMedia('(min-width:900px)').matches;
+
+function status(m){ $('status').textContent = m; }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function show(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  $(id).classList.add('active');
+  document.querySelectorAll('#bottomnav button').forEach(b=>b.classList.remove('active'));
+  const nav = { 'view-files':'nav-files','view-edit':'nav-edit','view-term':'nav-term','view-menu':'nav-menu' }[id];
+  if(nav) $(nav).classList.add('active');
+  if(wide()) $('views').classList.add('split'); else $('views').classList.remove('split');
+}
+window.addEventListener('resize', ()=>{ if(wide()) $('views').classList.add('split'); else $('views').classList.remove('split'); });
+if(wide()){ $('views').classList.add('split'); ['view-files','view-edit'].forEach(id=>$(id).classList.add('active')); }
+function toggleFiles(){ if(wide()){ $('view-files').classList.toggle('active'); } else show('view-files'); }
+
+/* explorer */
+function renderExpl(){
+  const e = $('expl');
+  let h = project ? '<h4>'+esc(project)+' — tap a file to edit</h4>' : '<h4>No project yet — Menu → New Project</h4>';
+  h += files.map(f=>'<div class="f'+(f.dir?' dir':'')+'" onclick="openRel(\''+f.path.replace(/'/g,"\\'")+'\')">'+(f.dir?'📁 ':'📄 ')+esc(f.name)+'</div>').join('');
+  e.innerHTML = h;
+}
+function refresh(){
+  if(!project){ renderExpl(); return; }
+  try {
+    const raw = ProjectBridge.projectTree(project);
+    files = JSON.parse(raw).map(p=>({path:p,name:p.split('/').pop(),dir:p.indexOf('.')<0}));
+  } catch(e){ files = []; }
+  renderExpl();
+}
+function openRel(rel){
+  let code = '';
+  try { code = FileBridge.readFile('projects/' + project + '/' + rel); } catch(e){}
+  let i = tabs.indexOf(rel);
+  if(i<0){ tabs.push(rel); i = tabs.length-1; }
+  active = i; renderTabs(); setCode(code);
+  const ext = (rel.split('.').pop()||'').toLowerCase();
+  $('lang').textContent = {kt:'kotlin',java:'java',py:'python',php:'php',blade:'blade',js:'javascript',ts:'typescript',json:'json',md:'markdown',html:'html',css:'css',sql:'sql',sh:'shell'}[ext]||'plaintext';
+  show('view-edit');
+}
+function renderTabs(){
+  $('tabs').innerHTML = tabs.map((t,i)=>'<span class="t'+(i===active?' active':'')+'" onclick="switchTab('+i+')">'+esc(t.split('/').pop())+(dirty[t]?' <span class=d>●</span>':'')+' <span class=x onclick="closeTab(event,'+i+')">✕</span></span>').join('');
+}
+function switchTab(i){ active = i; renderTabs(); setCode(FileBridge.readFile('projects/' + project + '/' + tabs[active])); }
+function closeTab(ev,i){ ev.stopPropagation(); tabs.splice(i,1); active = tabs.length-1; renderTabs(); setCode(active>=0?FileBridge.readFile('projects/'+project+'/'+tabs[active]):''); }
+function setCode(v){ $('code').value = v||''; updateCursor(); }
+function updateCursor(){ try{ const t=$('code'); const ln=t.value.slice(0,t.selectionStart).split('\n').length; $('cursor').textContent='Ln '+ln; }catch(e){} }
+$('code').addEventListener('input', ()=>{ updateCursor(); if(active>=0){ dirty[tabs[active]] = true; renderTabs(); } });
+$('code').addEventListener('click', updateCursor);
+$('code').addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='s'){ e.preventDefault(); save(); } });
+function save(){
+  if(active<0||!project){ status('Nothing open to save'); return; }
+  const ok = FileBridge.writeFile('projects/' + project + '/' + tabs[active], $('code').value);
+  if(ok){ dirty[tabs[active]] = false; renderTabs(); status('Saved ' + tabs[active]); } else status('Save FAILED');
+}
+function mkfile(){ if(!project){status('Create a project first (Menu)');return;} const n = prompt('File path (relative to project)', 'routes/web.php'); if(!n) return; FileBridge.createFile('projects/'+project+'/'+n); refresh(); }
+function mkdir(){ if(!project){status('Create a project first (Menu)');return;} const n = prompt('Folder path', 'app/Http'); if(!n) return; FileBridge.createDirectory('projects/'+project+'/'+n); refresh(); }
+
+/* terminal */
+function newTerm(){
+  try {
+    termId = TerminalBridge.createSession(project ? ('projects/'+project) : 'projects');
+    term('--- terminal #' + termId + ' ready ---\n');
+  } catch(e){ term('terminal unavailable: '+e+'\n'); }
+}
+function term(s){ $('term').textContent += s; $('term').scrollTop = 1e9; }
+function termSend(line){ if(termId<0){ newTerm(); } try{ TerminalBridge.write(termId, line+'\n'); }catch(e){ term('write failed\n'); } }
+function termKey(seq){ if(termId<0){ newTerm(); } try{ TerminalBridge.write(termId, seq); }catch(e){} }
+function termInterrupt(){ if(termId>=0) try{ TerminalBridge.interrupt(termId); term('^C\n'); }catch(e){} }
+window.__termData = function(id, chunk){ if(id===termId) term(chunk); };
+
+/* projects */
+function newProject(){
+  const name = prompt('Laravel project name', 'testapp');
+  if(!name) return;
+  project = name; $('proj').innerHTML = 'Custom VSCode <small>'+esc(name)+'</small>';
+  try{ FileBridge.createDirectory('projects/'+name); }catch(e){}
+  try{ ProjectBridge.createProject('laravel', name); }catch(e){}
+  status('Creating ' + name + ' — real composer create-project in background');
+  show('view-term'); if(termId<0) newTerm(); refresh();
+}
+window.__createProject = function(t, n){ if(n){ project = n; $('proj').innerHTML = 'Custom VSCode <small>'+esc(n)+'</small>'; refresh(); } };
+window.__projectEvent = function(msg){
+  msg = String(msg);
+  if(msg.startsWith('PREVIEW:')){ openPreviewUrl(msg.slice(8)); return; }
+  status(msg.slice(0, 200));
+  term('[project] ' + msg.slice(0, 500) + '\n');
+};
+
+/* run/preview (localhost on-device only) */
+function runServer(){
+  if(!project){ status('Create/open a project first'); show('view-menu'); return; }
+  let r = '';
+  try{ r = PreviewBridge.startLaravel(project); }catch(e){ r = 'ERR:'+e; }
+  status(r); term('[run] ' + r + '\n');
+  if(r.indexOf('OK:http')===0) openPreviewUrl(r.slice(3));
+}
+function openPreview(){
+  let u = '';
+  try{ u = PreviewBridge.url(); }catch(e){}
+  openPreviewUrl(u || 'http://127.0.0.1:8000');
+}
+function openPreviewUrl(u){ $('prevurl').textContent = u; $('prevf').src = u; $('prev').style.display = 'flex'; }
+window.__openPreview = openPreviewUrl;
+function closePreview(){ $('prev').style.display = 'none'; $('prevf').src = 'about:blank'; }
+
+/* settings */
+function showSettings(){
+  show('view-menu');
+  let list = [];
+  try{ list = JSON.parse(RuntimeBridge.listRuntimes()); }catch(e){}
+  let h = '<h4>Development Environments</h4>';
+  list.forEach(r=>{ h += '<div style="display:flex;align-items:center;gap:8px;padding:10px 4px;border-bottom:1px solid #333"><span style="flex:1">'+esc(r.id)+' — '+esc(r.status)+'</span><button style="min-height:44px;padding:6px 16px" onclick="installRt(\''+esc(r.id)+'\')">Install</button></div>'; });
+  h += '<h4>Frameworks</h4><div>Laravel needs: bash, git, php, composer, node, npm</div><button class="primary" style="width:100%;margin-top:8px" onclick="installLaravelEnv()">Install Laravel Environment</button>';
+  $('settings').innerHTML = h;
+}
+function installRt(id){ try{ status(RuntimeBridge.installRuntime(id)); }catch(e){ status('install failed: '+e); } }
+function installLaravelEnv(){ ['bash','git','php','composer','node','npm'].forEach(installRt); }
+
+/* command palette */
+const CMDS = ['New File','New Folder','Save','New Project','New Terminal','Run Laravel Server','Open Preview','npm install','npm run dev','Git Init','Environments','Reload'];
+function palette(){
+  const p = $('pal'); p.style.display = 'flex';
+  const inp = $('palin'); inp.value = ''; inp.focus(); renderPal('');
+  inp.oninput = ()=>renderPal(inp.value);
+  inp.onkeydown = e=>{ if(e.key==='Escape') p.style.display='none'; };
+}
+function renderPal(q){
+  $('palitems').innerHTML = CMDS.filter(c=>c.toLowerCase().includes(q.toLowerCase())).map(c=>'<div onclick="runCmd(\''+c+'\')">'+esc(c)+'</div>').join('');
+}
+function runCmd(c){
+  $('pal').style.display = 'none';
+  if(c==='New Project') newProject();
+  else if(c==='Save') save();
+  else if(c==='New File') mkfile();
+  else if(c==='New Folder') mkdir();
+  else if(c==='New Terminal'){ newTerm(); show('view-term'); }
+  else if(c==='Run Laravel Server') runServer();
+  else if(c==='Open Preview') openPreview();
+  else if(c==='Environments') showSettings();
+  else if(c==='Reload') location.reload();
+  else if(c==='npm install'){ show('view-term'); termSend('npm install'); }
+  else if(c==='npm run dev'){ show('view-term'); termSend('npm run dev'); }
+  else if(c==='Git Init'){ show('view-term'); termSend('git init'); }
+}
+renderExpl();
+</script>
+</body>
+</html>

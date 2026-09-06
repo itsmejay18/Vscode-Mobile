@@ -1,0 +1,1 @@
+{"id":"bash","name":"Bash","version":"5.2","abi":"arm64-v8a","binaries":["bash","sh"],"downloadSizeMb":4.5,"installSizeMb":12.0,"extensions":[""],"notes":"Interactive shell for terminal. Falls back to /system/bin/sh until installed."}

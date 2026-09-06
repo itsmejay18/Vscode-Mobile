@@ -1,0 +1,1 @@
+{"id":"npm","name":"npm","version":"10","abi":"all","binaries":["npm","npx"],"requires":["node"],"downloadSizeMb":8.0,"installSizeMb":30.0,"notes":"Ships with node distribution."}
