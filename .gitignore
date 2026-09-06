@@ -19,3 +19,10 @@ stores/snapcraft/insider/*.snap
 stores/snapcraft/stable/*.snap
 font-size/node_modules/
 font-size/generate-css.js
+# Android / mobile (Custom VSCode Mobile)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/dist/
+*.apk
