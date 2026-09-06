@@ -1,0 +1,1 @@
+{"id":"php","name":"PHP","version":"8.3","abi":"arm64-v8a","binaries":["php","php-cgi"],"downloadSizeMb":18.0,"installSizeMb":60.0,"requiredExtensions":["openssl","mbstring","tokenizer","xml","ctype","json","fileinfo","curl","pdo","pdo_sqlite","sqlite3","zip"],"notes":"Built for bionic/arm64 with Laravel extensions + sqlite default."}

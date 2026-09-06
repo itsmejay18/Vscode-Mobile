@@ -1,0 +1,1 @@
+{"id":"composer","name":"Composer","version":"2.7","abi":"all","binaries":["composer"],"downloadSizeMb":3.0,"installSizeMb":5.0,"requires":["php"],"notes":"Real composer.phar executed by installed PHP. Never simulated."}

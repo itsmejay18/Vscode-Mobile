@@ -1,0 +1,1 @@
+{"id":"node","name":"Node.js","version":"22","abi":"arm64-v8a","binaries":["node"],"downloadSizeMb":26.0,"installSizeMb":80.0,"notes":"Powers npm/npx/vite for Laravel frontend."}

@@ -1,0 +1,1 @@
+{"id":"laravel","name":"Laravel Environment","description":"Full Laravel stack on-device","requiredRuntimes":["bash","git","php","composer","node","npm"],"optionalRuntimes":["laravel-installer"],"installCommands":["composer create-project laravel/laravel <name>"],"projectTemplates":["laravel"],"validationCommands":["php artisan --version"]}
